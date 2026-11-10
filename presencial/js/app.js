@@ -7,14 +7,23 @@ var cardapio = {};
 
 var MEU_CARRINHO = [];
 var MEU_ENDERECO = null;
-VALOR_ENTREGA=0;
+var VALOR_CARRINHO = 0;
+var VALOR_ENTREGA = 0; // atualizado pelo servidor (/api/config)
 
-CELULAR_EMPRESA = '5511958705804';
+// 'online' = delivery | 'presencial' = pedido na mesa
+var MODO = 'presencial';
+var CHAVE_CARRINHO = 'go_carrinho_' + MODO;
+
+var CELULAR_EMPRESA = '5511958705804';
 
 cardapio.eventos = {
     init: () => {
-        cardapio.metodos.obterItensCardapio()
+        cardapio.metodos.restaurarCarrinho();
+        cardapio.metodos.obterItensCardapio();
 
+        if (cardapio.pagamento) {
+            cardapio.pagamento.init();
+        }
     }
 }
 
@@ -77,42 +86,85 @@ cardapio.metodos = {
         $('#qntd-' + id).text(qntdAtual + 1)
     },
 
+    // procura o item em todas as categorias do cardápio
+    buscarItemCardapio: (id) => {
+        let encontrado = null;
+
+        $.each(MENU, (categoria, itens) => {
+            $.each(itens, (i, e) => {
+                if (e.id == id) {
+                    encontrado = e;
+                    return false;
+                }
+            })
+            if (encontrado) return false;
+        })
+
+        return encontrado;
+    },
+
     // Adicionar ao carrinho o item do cardápio
     adicionarAoCarrinho: (id) => {
         let qntdAtual = parseInt($('#qntd-' + id).text());
-    
-        if (qntdAtual > 0) {
-            // Obter a categoria ativa
-            var categoria = $(".container-menu a.active").attr('id').split('menu-')[1];
-            
-            // Obter a lista de itens da categoria
-            let filtro = MENU[categoria];
-    
-            // Encontrar o item correspondente ao id
-            let item = $.grep(filtro, (e, i) => { return e.id == id });
-    
-            if (item.length > 0) {
-                // Verificar se o item já existe no carrinho
-                let existe = $.grep(MEU_CARRINHO, (elem, index) => { return elem.id == id });
-    
-                // Caso já exista o item no carrinho, apenas altera a quantidade
-                if (existe.length > 0) {
-                    let objIndex = MEU_CARRINHO.findIndex((obj => obj.id == id));
-                    MEU_CARRINHO[objIndex].qntd += qntdAtual;
-                } else {
-                    // Caso não exista o item no carrinho, adiciona-o
-                    item[0].qntd = qntdAtual;
-                    MEU_CARRINHO.push(item[0]);
-                }
-            }
+
+        if (qntdAtual <= 0) {
+            cardapio.metodos.mensagem('Escolha a quantidade antes de adicionar.');
+            return;
         }
-    
+
+        let item = cardapio.metodos.buscarItemCardapio(id);
+
+        if (!item) {
+            cardapio.metodos.mensagem('Item não encontrado no cardápio.');
+            return;
+        }
+
+        // Verificar se o item já existe no carrinho
+        let objIndex = MEU_CARRINHO.findIndex((obj => obj.id == id));
+
+        if (objIndex >= 0) {
+            // Caso já exista o item no carrinho, apenas altera a quantidade
+            MEU_CARRINHO[objIndex].qntd += qntdAtual;
+        } else {
+            // Caso não exista, adiciona uma CÓPIA do item (para não alterar o MENU)
+            MEU_CARRINHO.push($.extend({}, item, { qntd: qntdAtual }));
+        }
+
         cardapio.metodos.mensagem('Item adicionado ao carrinho', 'green');
-        $('#qntd-'+id).text(0);
+        $('#qntd-' + id).text(0);
 
         cardapio.metodos.atualizarBadgeTotal();
     },
-    
+
+    // salva o carrinho no navegador (não perde o pedido ao recarregar a página
+    // ou ao voltar do Mercado Pago)
+    salvarCarrinho: () => {
+        try {
+            localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(MEU_CARRINHO));
+        } catch (e) { }
+    },
+
+    restaurarCarrinho: () => {
+        try {
+            let salvo = JSON.parse(localStorage.getItem(CHAVE_CARRINHO) || '[]');
+
+            // mantém apenas itens que ainda existem no cardápio, com o preço atual
+            MEU_CARRINHO = $.map(salvo, (e) => {
+                let item = cardapio.metodos.buscarItemCardapio(e.id);
+                let qntd = parseInt(e.qntd);
+                return item && qntd > 0 ? $.extend({}, item, { qntd: qntd }) : null;
+            });
+        } catch (e) {
+            MEU_CARRINHO = [];
+        }
+
+        cardapio.metodos.atualizarBadgeTotal();
+    },
+
+    limparCarrinho: () => {
+        MEU_CARRINHO = [];
+        cardapio.metodos.atualizarBadgeTotal();
+    },
 
     atualizarBadgeTotal: () => {
         var total = 0;
@@ -130,6 +182,8 @@ cardapio.metodos = {
         }
 
         $(".badge-total-carrinho").html(total);
+
+        cardapio.metodos.salvarCarrinho();
     },
 
     // abrir a modal de carrinho
@@ -157,11 +211,12 @@ cardapio.metodos = {
             $("#btnEtapaPedido").removeClass('hidden')
             $("#btnEtapaEndereco").addClass('hidden')
             $("#btnEtapaEnviarResumo").addClass('hidden')
+            $("#btnPagarMercadoPago").addClass('hidden')
             $("#btnVoltar").addClass('hidden')
         }
 
         if (etapa == 2) {
-            $("#lblTituloEtapa").text('Endereço de entrega:')
+            $("#lblTituloEtapa").text('Mesa e identificação:')
             $("#itensCarrinho").addClass('hidden')
             $("#localEntrega").removeClass('hidden')
             $("#resumoCarrinho").addClass('hidden')
@@ -173,6 +228,7 @@ cardapio.metodos = {
             $("#btnEtapaPedido").addClass('hidden')
             $("#btnEtapaEndereco").removeClass('hidden')
             $("#btnEtapaEnviarResumo").addClass('hidden')
+            $("#btnPagarMercadoPago").addClass('hidden')
             $("#btnVoltar").removeClass('hidden')
         }
 
@@ -189,8 +245,16 @@ cardapio.metodos = {
 
             $("#btnEtapaPedido").addClass('hidden')
             $("#btnEtapaEndereco").addClass('hidden')
-            $("#btnEtapaEnviarResumo").removeClass('hidden')
+            $("#btnEtapaEnviarResumo").removeClass('hidden').text('Pedir pelo WhatsApp')
             $("#btnVoltar").removeClass('hidden')
+            $("#avisoPagamento").addClass('hidden')
+
+            // o botão do Mercado Pago só aparece se o servidor estiver configurado
+            if (typeof MP_ATIVO !== 'undefined' && MP_ATIVO) {
+                $("#btnPagarMercadoPago").removeClass('hidden')
+            } else {
+                $("#btnPagarMercadoPago").addClass('hidden')
+            }
         }
 
     },
@@ -229,7 +293,7 @@ cardapio.metodos = {
                 }
             })
         } else {
-            $("#itensCarrinho").html('<p class="carrinho-vazio"><i class="fa fa-shopping-bag"></i> Seu carrinho esta vazio.</p');
+            $("#itensCarrinho").html('<p class="carrinho-vazio"><i class="fa fa-shopping-bag"></i> Seu carrinho está vazio.</p>');
             cardapio.metodos.carregarValores();
         }
     },
@@ -279,19 +343,19 @@ cardapio.metodos = {
     carregarValores: () => {
         VALOR_CARRINHO = 0;
 
-        $("#lblSubTotal").text('R$ 0,00');
-        $("#lblValorEntrega").text('+ R$ 0,00');
-        $("#lblValorTotal").text('R$ 0,00');
-
         $.each(MEU_CARRINHO, (i, e) => {
             VALOR_CARRINHO += parseFloat(e.price * e.qntd);
-
-            if((i + 1) == MEU_CARRINHO.length) {
-                $("#lblSubTotal").text(`R$ ${VALOR_CARRINHO.toFixed(2).replace('.', ',')}`);
-                $("#lblValorEntrega").text(`+ R$ ${VALOR_ENTREGA.toFixed(2).replace('.', ',')}`)
-                $("#lblValorTotal").text(`R$ ${(VALOR_ENTREGA + VALOR_CARRINHO).toFixed(2).replace('.', ',')}`);
-            }
         })
+
+        let entrega = MEU_CARRINHO.length > 0 ? VALOR_ENTREGA : 0;
+
+        $("#lblSubTotal").text(cardapio.metodos.formatarMoeda(VALOR_CARRINHO));
+        $("#lblValorEntrega").text('+ ' + cardapio.metodos.formatarMoeda(entrega));
+        $("#lblValorTotal").text(cardapio.metodos.formatarMoeda(VALOR_CARRINHO + entrega));
+    },
+
+    formatarMoeda: (valor) => {
+        return `R$ ${valor.toFixed(2).replace('.', ',')}`;
     },
 
     carregarEndereco: () => {
@@ -303,26 +367,28 @@ cardapio.metodos = {
         cardapio.metodos.carregarEtapa(2);
     },
 
-    
-
     // validação antes de prosseguir para a etapa 3
     resumoPedido: () => {
 
-       
-        let endereco = $("#txtEndereco").val().trim();
+        let mesa = $("#txtEndereco").val().trim();
+        let nome = $("#txtNom").val().trim();
 
-
-        if(endereco.length <= 0) {
-            cardapio.metodos.mensagem('Informe o numero da sua mesa, por favor.');
+        if (mesa.length <= 0) {
+            cardapio.metodos.mensagem('Informe o número da sua mesa, por favor.');
             $("#txtEndereco").focus();
             return;
         }
 
+        if (nome.length <= 0) {
+            cardapio.metodos.mensagem('Informe o seu nome, por favor.');
+            $("#txtNom").focus();
+            return;
+        }
 
-
+        // mantém o nome MEU_ENDERECO para reaproveitar o fluxo do delivery
         MEU_ENDERECO = {
-            
-            endereco: endereco,
+            endereco: mesa,
+            nome: nome
         }
 
         cardapio.metodos.carregarEtapa(3);
@@ -343,43 +409,44 @@ cardapio.metodos = {
             $("#listaItensResumo").append(temp);
         })
 
-        $("#resumoEndereco").html(`${MEU_ENDERECO.endereco}`)
+        $("#resumoEndereco").text(MEU_ENDERECO.endereco)
+        $("#resumoNome").text(MEU_ENDERECO.nome)
     
         cardapio.metodos.finalizarPedido();
     },
 
+    // Monta o texto do pedido que vai para o WhatsApp do restaurante
+    // (infoPagamento é usado depois que o cliente paga pelo Mercado Pago)
+    montarTextoPedido: (infoPagamento) => {
+        let itens = '';
+
+        $.each(MEU_CARRINHO, (i, e) => {
+            itens += `*${e.qntd}x* ${e.name} .......  ${cardapio.metodos.formatarMoeda(e.price)} \n`
+        })
+
+        var texto = 'Olá! Gostaria de fazer um pedido:'
+        texto += `\n*Itens do pedido:* \n\n${itens}`
+        texto += `\n*Mesa:* ${MEU_ENDERECO.endereco}`
+        texto += `\n*Nome:* ${MEU_ENDERECO.nome}`
+        texto += `\n\n*Valor Total: ${cardapio.metodos.formatarMoeda(VALOR_CARRINHO + VALOR_ENTREGA)}*`
+
+        if (infoPagamento) {
+            texto += `\n\n${infoPagamento}`
+        } else {
+            texto += `\n\n*Pagamento:* no caixa / na mesa`
+        }
+
+        return texto;
+    },
+
     // Atualiza o link do botão do WhatsApp
-    finalizarPedido: () => {
+    finalizarPedido: (infoPagamento) => {
 
         if (MEU_CARRINHO.length > 0 && MEU_ENDERECO != null) {
+            let texto = cardapio.metodos.montarTextoPedido(infoPagamento);
+            let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encodeURIComponent(texto)}`;
 
-            var texto = 'Olá! Gostaria de fazer um pedido:'
-            texto += `\n*Itens do pedido:* \n\n\${itens}`
-            texto += "\n*Mesa de entrega:*"
-            texto += `\n${MEU_ENDERECO.endereco} `
-            
-            texto += `\n\n*Valor Total: R$ ${(VALOR_CARRINHO + VALOR_ENTREGA).toFixed(2).replace('.', ',')}*`
-
-
-            var itens = ''
-
-            $.each(MEU_CARRINHO, (i, e) => {
-                itens += `*${e.qntd}x* ${e.name} .......  R$ ${e.price.toFixed(2).replace('.', ',')} \n`
-
-                if((i + 1) == MEU_CARRINHO.length) {
-
-                    texto = texto.replace(/\${itens}/g, itens)
-
-                    //Converte a URL
-                    let encode = encodeURI(texto)
-                    let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encode}`
-
-                    $("#btnEtapaEnviarResumo").attr('href', URL)
-
-                }
-            })
-
-            
+            $("#btnEtapaEnviarResumo").attr('href', URL);
         }
 
     },
@@ -469,5 +536,3 @@ cardapio.templates = {
         </div>
     `
 }
-
-

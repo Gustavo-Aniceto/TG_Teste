@@ -879,3 +879,51 @@ select.form-control {
     border-radius: 50px;
     margin-bottom: 10px;
 }
+
+/* ===== Pagamento com Mercado Pago ===== */
+.toast.yellow {
+    background-color: var(--color-primary);
+    color: var(--color-black);
+}
+
+.btn-mercadopago {
+    background-color: #009ee3;
+    color: var(--color-white)!important;
+    border-radius: 20px;
+    padding: 15px 25px;
+    font-size: 20px;
+    box-shadow: 0px 10px 15px -3px rgba(0,0,0,0.1);
+    cursor: pointer;
+}
+
+.btn-mercadopago:hover {
+    background-color: #0084c0;
+}
+
+.btn-mercadopago.carregando {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.aviso-pagamento {
+    background-color: #e8f8ef;
+    border-left: 6px solid var(--color-green);
+    border-radius: 15px;
+    padding: 15px 20px;
+    margin-top: 20px;
+    color: var(--color-black);
+}
+
+.aviso-pagamento i {
+    color: var(--color-green);
+    margin-right: 5px;
+}
+
+.aviso-pagamento.aviso-pendente {
+    background-color: var(--color-secondary);
+    border-left-color: var(--color-primary);
+}
+
+.aviso-pagamento.aviso-pendente i {
+    color: var(--color-primary);
+}
