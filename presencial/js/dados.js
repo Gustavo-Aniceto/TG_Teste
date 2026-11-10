@@ -431,84 +431,84 @@ var MENU = {
     ],
     "Tradicionais": [
         {
-            "id": "plain-thin-crust-pizza-4-pack",
+            "id": "trad-feijoada-completa",
             "img": "./img/cardapio/steaks/OIP.jpg",
             "name": "Feijoada Completa",
             "dsc": "Feija,carnes,couve",
             "price": 80
         },
         {
-            "id": "tonys-custom-pizza-3-pack",
+            "id": "trad-curau-de-milho",
             "img": "./img/cardapio/steaks/curau.jpg",
             "name": "Curau de Milho",
             "dsc": " Milho, leite",
             "price": 30
         },
         {
-            "id": "4-lou-malnatis-deep-dish-pizzas",
+            "id": "trad-tambaqui-assado",
             "img": "./img/cardapio/steaks/Tambaqui assado com recheio.jpg",
             "name": "Tambaqui assado",
             "dsc": "assado recheiado",
             "price": 100
         },
         {
-            "id": "nola-cold-brew-concentrate-bag-in-box",
+            "id": "trad-moqueca-de-peixe",
             "img": "./img/cardapio/steaks/Moqueca de peixe.jpg",
             "name": "Moqueca de peixe",
             "dsc": "peixe assado",
             "price": 120
         },
         {
-            "id": "chickpea-chiller-kit-for-6",
+            "id": "trad-pato-no-tucupi",
             "img": "./img/cardapio/steaks/Pato no Tucupi.jpg",
             "name": "Pato no Tucupi",
             "dsc": "Pato no Tucupi",
             "price": 119
         },
         {
-            "id": "hong-kong-boba-tea-kit-for-6",
+            "id": "trad-galinhada-com-pequi",
             "img": "./img/cardapio/steaks/Galinhada com pequi.jpg",
             "name": "Galinhada com pequi",
             "dsc": "Galinhada,pequi",
             "price": 150
         },
         {
-            "id": "jacques-world-famous-chocolate-chip-cookies-12-pack",
+            "id": "trad-vaca-atolada",
             "img": "./img/cardapio/steaks/Vaca Atolada.jpg",
             "name": "Vaca Atolada",
             "dsc": "Vaca Atolada",
             "price": 130
         },
         {
-            "id": "goldbelly-burger-blend-4-lbs",
+            "id": "trad-acaraje",
             "img": "./img/cardapio/steaks/Acarajé.jpg",
             "name": "Acarajé",
             "dsc": "Acarajé, Pimenta",
             "price": 99
         },
         {
-            "id": "15259-german-chocolate-killer-brownie-tin-pack",
+            "id": "trad-maria-isabel",
             "img": "./img/cardapio/steaks/Maria Isabel.jpg",
             "name": "Maria Isabel",
             "dsc": "Maria Isabel",
             "price": 39
         },
         {
-            "id": "006-kings-meat-lovers-special",
+            "id": "trad-tacaca",
             "img": "./img/cardapio/steaks/tacacá.jpg",
             "name": "Tacacá",
             "dsc": "Tacacá",
             "price": 225
         },
         {
-            "id": "ribs-brisket-and-burnt-ends",
+            "id": "trad-contra-file",
             "img": "./img/cardapio/steaks/california-reserve-filet-mignon-steak.ff15071964ec8141d30c2ba05fb117e0.jpg",
             "name": "Contra Filé",
             "dsc": "Contra File e fritas",
             "price": 40
         },
         {
-            "id": "texas-monthlys-1-bbq-brisket",
+            "id": "trad-costela",
             "img": "./img/cardapio/steaks/mesquite-smoked-peppered-beef-tenderloin.5c314418a1f75c7057eed686e2fad46f.jpg",
             "name": "Costela",
             "dsc": "Costela Recheada",

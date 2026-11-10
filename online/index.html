@@ -73,7 +73,7 @@
                            
                         </div>
                     </div>
-                    <a class="btn btn-sm btn-white btn-social mt-4 mr-3 wow fadeIn delay-05s" href="https:/www.instagram.com/fatec_guarulhos/" target="_blank">
+                    <a class="btn btn-sm btn-white btn-social mt-4 mr-3 wow fadeIn delay-05s" href="https://www.instagram.com/fatec_guarulhos/" target="_blank">
                         <i class="fab fa-instagram"></i>
                     </a>
                     <a class="btn btn-sm btn-white btn-social mt-4 mr-3 wow fadeIn delay-05s" href="https://www.facebook.com/ftcguarulhos/" target="_blank">
@@ -149,12 +149,12 @@
                 </div>
 
                 <div class="col-12 col-one container-menu wow fadeInUp">
-                    <a id="menu-Tradicionais" class="btn btn-white btn-sm mr-3"
-
-                    onclick="cardapio.metodos.obterItensCardapio('Tradicionais')">
-                    &nbsp; Tradicionais
-                </a>
-                    <a id="menu-burgers" class="btn btn-white btn-sm mr-3 active"
+                    <a id="menu-Tradicionais" class="btn btn-white btn-sm mr-3 active"
+                        onclick="cardapio.metodos.obterItensCardapio('Tradicionais')">
+                        <i class="fas fa-utensils"></i>
+                        &nbsp; Tradicionais
+                    </a>
+                    <a id="menu-burgers" class="btn btn-white btn-sm mr-3"
                         onclick="cardapio.metodos.obterItensCardapio('burgers')">
                         <i class="fas fa-hamburger"></i>
                         &nbsp; Burgers
@@ -214,7 +214,7 @@
                                     <input type="text" id="nome" name="nome" placeholder="Seu Nome" required aria-label="Seu Nome">
                                 
                                     <label for="data">Data</label>
-                                    <input type="date" id="data" name="data" required aria-label="Data" min="<?= date('Y-m-d') ?>">
+                                    <input type="date" id="data" name="data" required aria-label="Data">
                                 
                                     <label for="hora">Hora</label>
                                     <input type="time" id="hora" name="hora" required aria-label="Hora">
@@ -266,8 +266,9 @@
                 <p>G&O Restaurante© Todos os Direitos Reservados</p>
             </div>
         </div>
+    </footer>
 
-        <div class="modal-full animated fadeIn hidden" id="modalCarrinho">
+    <div class="modal-full animated fadeIn hidden" id="modalCarrinho">
             <div class="m-header">
                 <div class="container">
                     <a class="btn btn-white btn-sm float-right"
@@ -335,6 +336,7 @@
                             <div class="form-group">
                                 <label>UF</label>
                                 <select class="form-control" id="ddlUf">
+                                    <option value="-1" selected>UF</option>
                                     <option value="AC">AC</option>
                                     <option value="AL">AL</option>
                                     <option value="AP">AP</option>
@@ -368,6 +370,10 @@
                     </div>
 
                     <div id="resumoCarrinho" class="row mr-0 ml-0 animated fadeIn hidden">
+                        <div class="col-12">
+                            <div id="avisoPagamento" class="aviso-pagamento hidden"></div>
+                        </div>
+
                         <div class="col-12">
                             <p class="title-carrinho mt-4">
                                 <b>Itens do pedido:</b>
@@ -412,7 +418,9 @@
                 <a class="btn btn-yellow float-right" id="btnEtapaPedido" onclick="cardapio.metodos.carregarEndereco()">Continuar</a>
                 <a class="btn btn-yellow float-right hidden" id="btnEtapaEndereco" onclick="cardapio.metodos.resumoPedido()">Revisar Pedido</a>
 
-                <a class="btn btn-yellow float-right hidden" id="btnEtapaEnviarResumo" href="#" target="_blank">Enviar Pedido</a>
+                <a class="btn btn-yellow float-right hidden" id="btnEtapaEnviarResumo" href="#" target="_blank">Pedir pelo WhatsApp</a>
+                <a class="btn btn-mercadopago float-right mr-3 hidden" id="btnPagarMercadoPago"
+                    onclick="cardapio.pagamento.pagar()"><i class="fas fa-credit-card"></i> Pagar com Mercado Pago</a>
                 <a class="btn btn-white float-right mr-3 hidden" id="btnVoltar" onclick="cardapio.metodos.voltarEtapa()">Voltar</a>
             </div>
         </div>
@@ -425,6 +433,7 @@
     <script src="js/popper.min.js"></script>
     <script src="js/dados.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/mercadopago.js"></script>
 
     <script>new WOW().init()</script>
 

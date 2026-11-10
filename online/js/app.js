@@ -7,14 +7,28 @@ var cardapio = {};
 
 var MEU_CARRINHO = [];
 var MEU_ENDERECO = null;
-VALOR_ENTREGA=0;
+var VALOR_CARRINHO = 0;
+var VALOR_ENTREGA = 0; // atualizado pelo servidor (/api/config)
 
-CELULAR_EMPRESA = '5511958705804';
+// 'online' = delivery | 'presencial' = pedido na mesa
+var MODO = 'online';
+var CHAVE_CARRINHO = 'go_carrinho_' + MODO;
+
+var CELULAR_EMPRESA = '5511958705804';
 
 cardapio.eventos = {
     init: () => {
-        cardapio.metodos.obterItensCardapio()
+        cardapio.metodos.restaurarCarrinho();
+        cardapio.metodos.obterItensCardapio();
 
+        // não permite reservar em datas passadas
+        let hoje = new Date();
+        hoje.setMinutes(hoje.getMinutes() - hoje.getTimezoneOffset());
+        $('#data').attr('min', hoje.toISOString().slice(0, 10));
+
+        if (cardapio.pagamento) {
+            cardapio.pagamento.init();
+        }
     }
 }
 
@@ -77,42 +91,85 @@ cardapio.metodos = {
         $('#qntd-' + id).text(qntdAtual + 1)
     },
 
+    // procura o item em todas as categorias do cardápio
+    buscarItemCardapio: (id) => {
+        let encontrado = null;
+
+        $.each(MENU, (categoria, itens) => {
+            $.each(itens, (i, e) => {
+                if (e.id == id) {
+                    encontrado = e;
+                    return false;
+                }
+            })
+            if (encontrado) return false;
+        })
+
+        return encontrado;
+    },
+
     // Adicionar ao carrinho o item do cardápio
     adicionarAoCarrinho: (id) => {
         let qntdAtual = parseInt($('#qntd-' + id).text());
-    
-        if (qntdAtual > 0) {
-            // Obter a categoria ativa
-            var categoria = $(".container-menu a.active").attr('id').split('menu-')[1];
-            
-            // Obter a lista de itens da categoria
-            let filtro = MENU[categoria];
-    
-            // Encontrar o item correspondente ao id
-            let item = $.grep(filtro, (e, i) => { return e.id == id });
-    
-            if (item.length > 0) {
-                // Verificar se o item já existe no carrinho
-                let existe = $.grep(MEU_CARRINHO, (elem, index) => { return elem.id == id });
-    
-                // Caso já exista o item no carrinho, apenas altera a quantidade
-                if (existe.length > 0) {
-                    let objIndex = MEU_CARRINHO.findIndex((obj => obj.id == id));
-                    MEU_CARRINHO[objIndex].qntd += qntdAtual;
-                } else {
-                    // Caso não exista o item no carrinho, adiciona-o
-                    item[0].qntd = qntdAtual;
-                    MEU_CARRINHO.push(item[0]);
-                }
-            }
+
+        if (qntdAtual <= 0) {
+            cardapio.metodos.mensagem('Escolha a quantidade antes de adicionar.');
+            return;
         }
-    
+
+        let item = cardapio.metodos.buscarItemCardapio(id);
+
+        if (!item) {
+            cardapio.metodos.mensagem('Item não encontrado no cardápio.');
+            return;
+        }
+
+        // Verificar se o item já existe no carrinho
+        let objIndex = MEU_CARRINHO.findIndex((obj => obj.id == id));
+
+        if (objIndex >= 0) {
+            // Caso já exista o item no carrinho, apenas altera a quantidade
+            MEU_CARRINHO[objIndex].qntd += qntdAtual;
+        } else {
+            // Caso não exista, adiciona uma CÓPIA do item (para não alterar o MENU)
+            MEU_CARRINHO.push($.extend({}, item, { qntd: qntdAtual }));
+        }
+
         cardapio.metodos.mensagem('Item adicionado ao carrinho', 'green');
-        $('#qntd-'+id).text(0);
+        $('#qntd-' + id).text(0);
 
         cardapio.metodos.atualizarBadgeTotal();
     },
-    
+
+    // salva o carrinho no navegador (não perde o pedido ao recarregar a página
+    // ou ao voltar do Mercado Pago)
+    salvarCarrinho: () => {
+        try {
+            localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(MEU_CARRINHO));
+        } catch (e) { }
+    },
+
+    restaurarCarrinho: () => {
+        try {
+            let salvo = JSON.parse(localStorage.getItem(CHAVE_CARRINHO) || '[]');
+
+            // mantém apenas itens que ainda existem no cardápio, com o preço atual
+            MEU_CARRINHO = $.map(salvo, (e) => {
+                let item = cardapio.metodos.buscarItemCardapio(e.id);
+                let qntd = parseInt(e.qntd);
+                return item && qntd > 0 ? $.extend({}, item, { qntd: qntd }) : null;
+            });
+        } catch (e) {
+            MEU_CARRINHO = [];
+        }
+
+        cardapio.metodos.atualizarBadgeTotal();
+    },
+
+    limparCarrinho: () => {
+        MEU_CARRINHO = [];
+        cardapio.metodos.atualizarBadgeTotal();
+    },
 
     atualizarBadgeTotal: () => {
         var total = 0;
@@ -130,6 +187,8 @@ cardapio.metodos = {
         }
 
         $(".badge-total-carrinho").html(total);
+
+        cardapio.metodos.salvarCarrinho();
     },
 
     // abrir a modal de carrinho
@@ -157,6 +216,7 @@ cardapio.metodos = {
             $("#btnEtapaPedido").removeClass('hidden')
             $("#btnEtapaEndereco").addClass('hidden')
             $("#btnEtapaEnviarResumo").addClass('hidden')
+            $("#btnPagarMercadoPago").addClass('hidden')
             $("#btnVoltar").addClass('hidden')
         }
 
@@ -173,6 +233,7 @@ cardapio.metodos = {
             $("#btnEtapaPedido").addClass('hidden')
             $("#btnEtapaEndereco").removeClass('hidden')
             $("#btnEtapaEnviarResumo").addClass('hidden')
+            $("#btnPagarMercadoPago").addClass('hidden')
             $("#btnVoltar").removeClass('hidden')
         }
 
@@ -189,8 +250,16 @@ cardapio.metodos = {
 
             $("#btnEtapaPedido").addClass('hidden')
             $("#btnEtapaEndereco").addClass('hidden')
-            $("#btnEtapaEnviarResumo").removeClass('hidden')
+            $("#btnEtapaEnviarResumo").removeClass('hidden').text('Pedir pelo WhatsApp')
             $("#btnVoltar").removeClass('hidden')
+            $("#avisoPagamento").addClass('hidden')
+
+            // o botão do Mercado Pago só aparece se o servidor estiver configurado
+            if (typeof MP_ATIVO !== 'undefined' && MP_ATIVO) {
+                $("#btnPagarMercadoPago").removeClass('hidden')
+            } else {
+                $("#btnPagarMercadoPago").addClass('hidden')
+            }
         }
 
     },
@@ -229,7 +298,7 @@ cardapio.metodos = {
                 }
             })
         } else {
-            $("#itensCarrinho").html('<p class="carrinho-vazio"><i class="fa fa-shopping-bag"></i> Seu carrinho esta vazio.</p');
+            $("#itensCarrinho").html('<p class="carrinho-vazio"><i class="fa fa-shopping-bag"></i> Seu carrinho está vazio.</p>');
             cardapio.metodos.carregarValores();
         }
     },
@@ -279,19 +348,19 @@ cardapio.metodos = {
     carregarValores: () => {
         VALOR_CARRINHO = 0;
 
-        $("#lblSubTotal").text('R$ 0,00');
-        $("#lblValorEntrega").text('+ R$ 0,00');
-        $("#lblValorTotal").text('R$ 0,00');
-
         $.each(MEU_CARRINHO, (i, e) => {
             VALOR_CARRINHO += parseFloat(e.price * e.qntd);
-
-            if((i + 1) == MEU_CARRINHO.length) {
-                $("#lblSubTotal").text(`R$ ${VALOR_CARRINHO.toFixed(2).replace('.', ',')}`);
-                $("#lblValorEntrega").text(`+ R$ ${VALOR_ENTREGA.toFixed(2).replace('.', ',')}`)
-                $("#lblValorTotal").text(`R$ ${(VALOR_ENTREGA + VALOR_CARRINHO).toFixed(2).replace('.', ',')}`);
-            }
         })
+
+        let entrega = MEU_CARRINHO.length > 0 ? VALOR_ENTREGA : 0;
+
+        $("#lblSubTotal").text(cardapio.metodos.formatarMoeda(VALOR_CARRINHO));
+        $("#lblValorEntrega").text('+ ' + cardapio.metodos.formatarMoeda(entrega));
+        $("#lblValorTotal").text(cardapio.metodos.formatarMoeda(VALOR_CARRINHO + entrega));
+    },
+
+    formatarMoeda: (valor) => {
+        return `R$ ${valor.toFixed(2).replace('.', ',')}`;
     },
 
     carregarEndereco: () => {
@@ -415,44 +484,45 @@ cardapio.metodos = {
             $("#listaItensResumo").append(temp);
         })
 
-        $("#resumoEndereco").html(`${MEU_ENDERECO.endereco}, ${MEU_ENDERECO.numero}, ${MEU_ENDERECO.bairro}`)
-        $("#cidadendereco").html(`${MEU_ENDERECO.cidade}-${MEU_ENDERECO.uf} / ${MEU_ENDERECO.cep} ${MEU_ENDERECO.complemento}`)
+        $("#resumoEndereco").text(`${MEU_ENDERECO.endereco}, ${MEU_ENDERECO.numero}, ${MEU_ENDERECO.bairro}`)
+        $("#cidadendereco").text(`${MEU_ENDERECO.cidade}-${MEU_ENDERECO.uf} / ${MEU_ENDERECO.cep} ${MEU_ENDERECO.complemento}`)
     
         cardapio.metodos.finalizarPedido();
     },
 
+    // Monta o texto do pedido que vai para o WhatsApp do restaurante
+    // (infoPagamento é usado depois que o cliente paga pelo Mercado Pago)
+    montarTextoPedido: (infoPagamento) => {
+        let itens = '';
+
+        $.each(MEU_CARRINHO, (i, e) => {
+            itens += `*${e.qntd}x* ${e.name} .......  ${cardapio.metodos.formatarMoeda(e.price)} \n`
+        })
+
+        var texto = 'Olá! Gostaria de fazer um pedido:'
+        texto += `\n*Itens do pedido:* \n\n${itens}`
+        texto += "\n*Endereço de entrega:*"
+        texto += `\n${MEU_ENDERECO.endereco}, ${MEU_ENDERECO.numero}, ${MEU_ENDERECO.bairro}`
+        texto += `\n${MEU_ENDERECO.cidade} - ${MEU_ENDERECO.uf} / ${MEU_ENDERECO.cep} ${MEU_ENDERECO.complemento}`
+        texto += `\n\n*Valor Total: ${cardapio.metodos.formatarMoeda(VALOR_CARRINHO + VALOR_ENTREGA)}*`
+
+        if (infoPagamento) {
+            texto += `\n\n${infoPagamento}`
+        } else {
+            texto += `\n\n*Pagamento:* na entrega`
+        }
+
+        return texto;
+    },
+
     // Atualiza o link do botão do WhatsApp
-    finalizarPedido: () => {
+    finalizarPedido: (infoPagamento) => {
 
         if (MEU_CARRINHO.length > 0 && MEU_ENDERECO != null) {
+            let texto = cardapio.metodos.montarTextoPedido(infoPagamento);
+            let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encodeURIComponent(texto)}`;
 
-            var texto = 'Olá! Gostaria de fazer um pedido:'
-            texto += `\n*Itens do pedido:* \n\n\${itens}`
-            texto += "\n*Endereço de entrega:*"
-            texto += `\n${MEU_ENDERECO.endereco}, ${MEU_ENDERECO.numero}, ${MEU_ENDERECO.bairro}`
-            texto += `\n${MEU_ENDERECO.cidade} - ${MEU_ENDERECO.uf} / ${MEU_ENDERECO.cep} ${MEU_ENDERECO.complemento}`
-            texto += `\n\n*Valor Total: R$ ${(VALOR_CARRINHO + VALOR_ENTREGA).toFixed(2).replace('.', ',')}*`
-
-
-            var itens = ''
-
-            $.each(MEU_CARRINHO, (i, e) => {
-                itens += `*${e.qntd}x* ${e.name} .......  R$ ${e.price.toFixed(2).replace('.', ',')} \n`
-
-                if((i + 1) == MEU_CARRINHO.length) {
-
-                    texto = texto.replace(/\${itens}/g, itens)
-
-                    //Converte a URL
-                    let encode = encodeURI(texto)
-                    let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encode}`
-
-                    $("#btnEtapaEnviarResumo").attr('href', URL)
-
-                }
-            })
-
-            
+            $("#btnEtapaEnviarResumo").attr('href', URL);
         }
 
     },
@@ -545,61 +615,49 @@ cardapio.templates = {
 
 
 
-function carregarBotaoLigar() {
-    const nome = $('#nome').val();
-    const data = $('#data').val();
-    const hora = $('#hora').val();
-    const pessoas = $('#pessoas').val();
+// Reserva: valida os dados e envia a solicitação pelo WhatsApp do restaurante
+function validarReserva() {
+    const nome = $('#nome').val().trim();
+    const dataTexto = $('#data').val();
+    const horario = $('#hora').val();
+    const pessoas = parseInt($('#pessoas').val());
 
-    // Verificar se todos os campos foram preenchidos
-    if (!nome || !data || !hora || !pessoas) {
-        mensagem("Por favor, preencha todos os campos!", "red");
-        return;
+    if (!nome || !dataTexto || !horario || !pessoas) {
+        cardapio.metodos.mensagem('Por favor, preencha todos os campos!');
+        return false;
     }
 
-    let texto = `Olá! Gostaria de fazer uma *reserva*.\nNome: ${nome}\nData: ${data}\nHora: ${hora}\nNúmero de Pessoas: ${pessoas}`;
-    let encode = encodeURIComponent(texto);
-    let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encode}`;
+    // Validação da data (compara só o dia, sem o horário)
+    const [ano, mes, dia] = dataTexto.split('-').map(Number);
+    const data = new Date(ano, mes - 1, dia);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    if (data < hoje) {
+        cardapio.metodos.mensagem('Por favor, escolha uma data a partir de hoje.');
+        return false;
+    }
+
+    // Funcionamento: das 14:00 às 23:59
+    const [hora] = horario.split(':').map(Number);
+    if (hora < 14) {
+        cardapio.metodos.mensagem('Por favor, escolha um horário entre 14:00 e 23:59.');
+        return false;
+    }
+
+    if (pessoas < 1) {
+        cardapio.metodos.mensagem('Por favor, insira um número válido de pessoas.');
+        return false;
+    }
+
+    const dataFormatada = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`;
+    let texto = `Olá! Gostaria de fazer uma *reserva*.\nNome: ${nome}\nData: ${dataFormatada}\nHora: ${horario}\nNúmero de Pessoas: ${pessoas}`;
+    let URL = `https://wa.me/${CELULAR_EMPRESA}?text=${encodeURIComponent(texto)}`;
 
     window.open(URL, '_blank');
+    cardapio.metodos.mensagem('Abrindo o WhatsApp para confirmar sua reserva...', 'green');
+    $('#formReserva')[0].reset();
+
+    // impede o envio do formulário (que recarregaria a página)
+    return false;
 }
-
-function validarReserva() {
-    const nome = document.getElementById('nome').value.trim();
-    const data = new Date(document.getElementById('data').value);
-    const horario = document.getElementById('hora').value;
-    const pessoas = document.getElementById('pessoas').value;
-    const hoje = new Date();
-
-    // Validação do nome
-    if (!nome) {
-        alert("Por favor, insira seu nome.");
-        return false;
-    }
-
-    // Validação da data
-    hoje.setHours(0, 0, 0, 0); // Remove a hora da data atual para comparação
-    if (data < hoje) {
-        alert("Por favor, escolha uma data futura.");
-        return false;
-    }
-
-    // Validação do horário
-    const [hora, minuto] = horario.split(':').map(Number);
-    if (hora < 14 || (hora > 23 || (hora === 23 && minuto > 59))) {
-        alert("Por favor, escolha um horário entre 14:00 e 24:00.");
-        return false;
-    }
-
-    // Validação do número de pessoas
-    if (pessoas < 1) {
-        alert("Por favor, insira um número válido de pessoas.");
-        return false;
-    }
-
-    alert("Reserva realizada com sucesso!");
-    return true;
-}
-
-
-

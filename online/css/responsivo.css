@@ -203,3 +203,22 @@
         font-size: 16px;
     }
 }
+
+/* Botões do resumo do pedido empilhados no celular */
+@media (max-width: 767px) {
+    .m-footer .btn-mercadopago,
+    .m-footer .btn-yellow,
+    .m-footer .btn-white {
+        float: none!important;
+        display: block;
+        width: 100%;
+        margin: 0 0 10px 0!important;
+        text-align: center;
+    }
+
+    .btn-mercadopago {
+        padding: 13px 15px;
+        font-size: 17px;
+        white-space: normal;
+    }
+}
